@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Murajaa</title>
+<style>
+  body { font-family: sans-serif; max-width: 760px; margin: 2em auto; padding: 0 1em; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #bbb; padding: 6px 8px; text-align: center; }
+  th:first-child, td:first-child { text-align: left; }
+  .message { background: #eef6ee; border: 1px solid #9c9; padding: 8px; }
+  label { display: block; margin-top: 8px; }
+  input, textarea { width: 100%; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<h1>Murajaa</h1>
+<p>Flash cards in five Leitner boxes. A card you know moves up a box and comes back later;
+a card you miss goes back to box 1 and comes back tomorrow.</p>
+
+{% if message %}<p class="message">{{ message }}</p>{% endif %}
+
+<h2>Decks</h2>
+{% if decks %}
+<table>
+  <tr>
+    <th>Deck</th><th>Cards</th><th>Due today</th>
+    {% for number, days in boxes.items() %}<th>Box {{ number }}<br><small>every {{ days }} d</small></th>{% endfor %}
+    <th></th>
+  </tr>
+  {% for name, info in decks.items() %}
+  <tr>
+    <td>{{ name }}</td><td>{{ info.total }}</td><td>{{ info.due }}</td>
+    {% for number in boxes %}<td>{{ info.boxes[number] }}</td>{% endfor %}
+    <td><a href="{{ url_for('study', deck=name) }}">Study</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No cards yet. Add one below.</p>
+{% endif %}
+
+<h2>Add a card</h2>
+<form method="post" action="{{ url_for('add') }}">
+  <label>Deck <input name="deck" list="deck-names"></label>
+  <datalist id="deck-names">{% for name in decks %}<option value="{{ name }}">{% endfor %}</datalist>
+  <label>Question <textarea name="front" rows="2"></textarea></label>
+  <label>Answer <textarea name="back" rows="3"></textarea></label>
+  <p><button type="submit">Add</button></p>
+</form>
+</body>
+</html>
