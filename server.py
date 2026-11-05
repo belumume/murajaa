@@ -38,8 +38,9 @@ def read_knew_it():
 @app.route('/')
 def home():
     message = request.args.get('message', '')
+    failed = request.args.get('failed', '') == 'yes'
     decks = store.summary(date.today())
-    return render_template('home.html', decks=decks, boxes=INTERVALS, message=message)
+    return render_template('home.html', decks=decks, boxes=INTERVALS, message=message, failed=failed)
 
 
 @app.route('/add', methods=['POST'])
@@ -47,10 +48,9 @@ def add():
     try:
         card = Card(request.form['deck'], request.form['front'], request.form['back'])
         store.add(card)
-        message = 'added a card to ' + card.deck
     except CardError as error:
-        message = str(error)
-    return redirect(url_for('home', message=message))
+        return redirect(url_for('home', message=str(error), failed='yes'))
+    return redirect(url_for('home', message='Added a card to ' + card.deck + '.'))
 
 
 @app.route('/study/<deck>')
@@ -59,7 +59,8 @@ def study(deck):
         abort(404)
     due = store.due_cards(deck, date.today())
     card = due[0] if len(due) > 0 else None
-    return render_template('study.html', deck=deck, card=card, left=len(due))
+    message = request.args.get('message', '')
+    return render_template('study.html', deck=deck, card=card, left=len(due), message=message)
 
 
 @app.route('/answer/<int:card_id>', methods=['POST'])
@@ -71,9 +72,11 @@ def answer(card_id):
     except NotDueError:
         # a double click: the first answer already counted
         card = store.get(card_id)
+        return redirect(url_for('study', deck=card.deck, message='That card was already answered.'))
     except CardError:
         abort(404)
-    return redirect(url_for('study', deck=card.deck))
+    message = 'Now in box ' + str(card.box) + ', back on ' + str(card.due.day) + ' ' + card.due.strftime('%b') + '.'
+    return redirect(url_for('study', deck=card.deck, message=message))
 
 
 # ---------- JSON API for the desktop app ----------

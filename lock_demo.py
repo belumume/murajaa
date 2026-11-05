@@ -35,5 +35,5 @@ real_lock = server.answer_lock
 for name, lock in (('with the lock', real_lock), ('without the lock', contextlib.nullcontext())):
     server.answer_lock = lock
     results = [four_answers_at_once() for _ in range(50)]
-    wrong = sum(1 for counted in results if counted != 1)
-    print(name + ': more than one answer counted in', wrong, 'of 50 runs; most in one run:', max(results))
+    exactly_one = results.count(1)
+    print(name + ': exactly one answer counted in', exactly_one, 'of 50 runs; at most', max(results), 'counted in one run')

@@ -1,0 +1,42 @@
+:root { --accent: #0f766e; --accent-light: #e6f2f1; --miss: #b43c2f; --miss-light: #fbe9e7;
+        --ink: #1f2937; --muted: #5b6470; --line: #d5d9de; }
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: #fafbfb;
+       font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem; }
+h1 { margin: 0 0 .25rem; color: var(--accent); }
+h2 { margin-top: 2rem; font-size: 1.15rem; }
+a { color: var(--accent); }
+.lead { margin-top: 0; color: var(--muted); }
+.message { padding: .6rem .9rem; border-radius: 6px; background: var(--accent-light); }
+.message.error { background: var(--miss-light); color: var(--miss); }
+
+.deck { display: flex; align-items: center; gap: 1rem; padding: .9rem 0; border-bottom: 1px solid var(--line); }
+.deck .name { flex: 1; font-weight: 600; }
+.deck .due { color: var(--muted); white-space: nowrap; }
+.boxes { display: flex; gap: 3px; margin-top: .35rem; }
+.boxes span { width: 2.6rem; padding: 1px 0; border-radius: 3px; text-align: center; font-size: .8rem;
+              background: #eef0f2; color: var(--muted); }
+.boxes span.full { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+
+.button { display: inline-block; padding: .5rem 1.1rem; border: 0; border-radius: 6px; font: inherit;
+          background: var(--accent); color: #fff; text-decoration: none; cursor: pointer; }
+.button.miss { background: var(--miss); }
+
+form.add label { display: block; margin-top: .7rem; font-weight: 600; }
+form.add input, form.add textarea { width: 100%; padding: .45rem; font: inherit;
+                                    border: 1px solid var(--line); border-radius: 6px; }
+form.add .button { margin-top: 1rem; }
+
+.card { margin: 1rem 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.card .front { margin: 0 0 1rem; font-size: 1.4rem; font-weight: 600; }
+.card summary { color: var(--accent); cursor: pointer; }
+.card .back { margin: 1rem 0 1.25rem; white-space: pre-wrap; }
+.answers { display: flex; gap: .75rem; }
+.answers form { flex: 1; }
+.answers .button { width: 100%; }
+
+@media (max-width: 30rem) {
+  .deck { flex-wrap: wrap; row-gap: .5rem; }
+  .deck .name { flex-basis: 100%; }
+}

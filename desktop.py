@@ -1,4 +1,5 @@
 import json
+from datetime import date
 import queue
 import socket
 import threading
@@ -60,7 +61,8 @@ class StudyWindow:
         self.results = queue.Queue()
 
         root.title('Murajaa')
-        root.geometry('560x340')
+        root.geometry('600x380')
+        root.minsize(600, 380)
 
         tk.Label(root, text='Deck').grid(row=0, column=0, padx=8, pady=8, sticky='w')
         self.deck_name = tk.StringVar(value='')
@@ -72,19 +74,29 @@ class StudyWindow:
         self.status = tk.Label(root, text='', fg='#555')
         self.status.grid(row=1, column=0, columnspan=3, padx=8, sticky='w')
 
-        self.front = tk.Label(root, text='', font=('Arial', 13, 'bold'), wraplength=520, justify='left')
+        self.front = tk.Label(root, text='', font=('Arial', 16, 'bold'), wraplength=560, justify='left')
         self.front.grid(row=2, column=0, columnspan=3, padx=8, pady=12, sticky='w')
-        self.back = tk.Label(root, text='', wraplength=520, justify='left')
+        self.back = tk.Label(root, text='', font=('Arial', 12), wraplength=560, justify='left')
         self.back.grid(row=3, column=0, columnspan=3, padx=8, sticky='w')
 
         buttons = tk.Frame(root)
         buttons.grid(row=4, column=0, columnspan=3, pady=16)
-        self.show_button = tk.Button(buttons, text='Show the answer', command=self.show_answer)
-        self.yes_button = tk.Button(buttons, text='I knew it', command=lambda: self.send_answer('yes'))
-        self.no_button = tk.Button(buttons, text='I did not', command=lambda: self.send_answer('no'))
+        self.show_button = tk.Button(buttons, text='Show the answer (space)', command=self.show_answer)
+        self.yes_button = tk.Button(buttons, text='I knew it (1)', command=lambda: self.send_answer('yes'))
+        self.no_button = tk.Button(buttons, text='I did not (2)', command=lambda: self.send_answer('no'))
         for button in (self.show_button, self.yes_button, self.no_button):
             button.pack(side='left', padx=6)
             button.config(state='disabled')
+
+        # where the last answered card went
+        self.last = tk.Label(root, text='', fg='#0f766e')
+        self.last.grid(row=5, column=0, columnspan=3, padx=8, sticky='w')
+
+        # keys: space shows the answer, 1 = I knew it, 2 = I did not.
+        # invoke() does nothing while a button is disabled.
+        root.bind('<space>', lambda event: self.show_button.invoke())
+        root.bind('1', lambda event: self.yes_button.invoke())
+        root.bind('2', lambda event: self.no_button.invoke())
 
         root.columnconfigure(1, weight=1)
         self.check_results()
@@ -125,7 +137,7 @@ class StudyWindow:
             # answered already (for example in the browser): go to the next card
             self.cards.pop(0)
             self.next_card()
-            self.status.config(text='That card was already answered. ' + self.status.cget('text'))
+            self.last.config(text='That card was already answered.')
             return
         elif isinstance(error, ServerError):
             self.status.config(text='The server answered with error ' + str(error.status) + '.')
@@ -176,7 +188,7 @@ class StudyWindow:
             return
         card = self.cards[0]
         self.front.config(text=card['front'])
-        self.status.config(text=str(len(self.cards)) + ' card(s) due. This one is in box ' + str(card['box']) + '.')
+        self.status.config(text=str(len(self.cards)) + ' due. This one is in box ' + str(card['box']) + '.')
         self.show_button.config(state='normal')
         self.yes_button.config(state='disabled')
         self.no_button.config(state='disabled')
@@ -197,8 +209,9 @@ class StudyWindow:
     def answer_saved(self, card):
         self.cards.pop(0)
         self.next_card()
-        self.status.config(text=self.status.cget('text') + '  Last card: now box ' + str(card['box'])
-                           + ', back on ' + card['due'] + '.')
+        due = date.fromisoformat(card['due'])
+        self.last.config(text='Last card: now in box ' + str(card['box']) + ', back on '
+                         + str(due.day) + ' ' + due.strftime('%b') + '.')
 
 
 if __name__ == '__main__':

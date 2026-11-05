@@ -1,39 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Study {{ deck }}</title>
-<style>
-  body { font-family: sans-serif; max-width: 760px; margin: 2em auto; padding: 0 1em; }
-  .card { border: 1px solid #bbb; border-radius: 6px; padding: 1em; margin: 1em 0; }
-  .back { white-space: pre-wrap; margin-top: 1em; }
-  form { display: inline; }
-  button { font-size: 1em; padding: 6px 14px; }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<main>
 <p><a href="{{ url_for('home') }}">All decks</a></p>
 <h1>{{ deck }}</h1>
 
+{% if message %}<p class="message">{{ message }}</p>{% endif %}
+
 {% if card %}
-<p>{{ left }} card(s) due. This one is in box {{ card.box }}.</p>
+<p class="lead">{{ left }} card{{ 's' if left > 1 }} due. This one is in box {{ card.box }}.</p>
 <div class="card">
-  <strong>{{ card.front }}</strong>
+  <p class="front">{{ card.front }}</p>
   <details>
     <summary>Show the answer</summary>
     <div class="back">{{ card.back }}</div>
-    <div>
-    <form method="post" action="{{ url_for('answer', card_id=card.card_id) }}">
-      <input type="hidden" name="knew_it" value="yes"><button type="submit">I knew it</button>
-    </form>
-    <form method="post" action="{{ url_for('answer', card_id=card.card_id) }}">
-      <input type="hidden" name="knew_it" value="no"><button type="submit">I did not</button>
-    </form>
+    <div class="answers">
+      <form method="post" action="{{ url_for('answer', card_id=card.card_id) }}">
+        <input type="hidden" name="knew_it" value="yes"><button class="button" type="submit">I knew it</button>
+      </form>
+      <form method="post" action="{{ url_for('answer', card_id=card.card_id) }}">
+        <input type="hidden" name="knew_it" value="no"><button class="button miss" type="submit">I did not</button>
+      </form>
     </div>
   </details>
 </div>
 {% else %}
 <p>Nothing is due in this deck today.</p>
 {% endif %}
+</main>
 </body>
 </html>

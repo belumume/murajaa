@@ -31,11 +31,13 @@ threads, SQLite, sockets, Flask) and common Python mistakes. You can add your ow
 
 ## Run it
 
+Python 3.10 or newer. In the `murajaa` folder:
+
 ```
 pip install flask
 python seed.py        # once: adds the 26 starter cards
 python server.py      # keep this running
-python desktop.py     # in a second terminal, optional
+python desktop.py     # in a second terminal (keys: space, 1, 2)
 python lock_demo.py   # shows why the server needs its lock
 ```
 
@@ -50,28 +52,29 @@ python lock_demo.py   # shows why the server needs its lock
 | `seed.py` | the starter cards, as a list of tuples |
 | `lock_demo.py` | four answers to one card at the same moment, with and without the lock |
 | `templates/` | `home.html` and `study.html` |
+| `static/style.css` | the look of both pages |
 
 ## Where each chapter is used
 
 | Chapter | Where |
 |---|---|
-| Collections and generic types | `INTERVALS` dict (box → days); `STARTER_CARDS` list of tuples; `summary()` builds a dict of dicts; type hints such as `list[Card]` in `store.py` |
+| Collections and generic types | `INTERVALS` dict (box → days); `STARTER_CARDS` list of tuples; `summary()` builds a dict of dicts; type hints such as `date | None` in `cards.py` and `list[Card]` in `store.py` |
 | Exceptions | `CardError(Exception)` and its subclass `NotDueError`, raised by `Card` and `CardStore.get` and caught in the server (message, 404 or 409); `ServerError`, `OSError` and `ValueError` caught in the desktop app; `try/finally` closes every database connection and socket |
 | OOP | classes `Card`, `CardStore`, `StudyWindow`; constructors with validation; `__str__` |
-| GUI | `desktop.py`: `Tk`, `Label`, `Button`, `OptionMenu`, `Frame`, `grid` and `pack`, `mainloop`, `after` |
+| GUI | `desktop.py`: `Tk`, `Label`, `Button`, `OptionMenu`, `Frame`, `grid` and `pack`, key bindings with `bind`, `mainloop`, `after` |
 | Multithreading | `threading.Lock` in `server.py` so that only one of several answers arriving together counts (`lock_demo.py`); worker threads and a `queue.Queue` in `desktop.py` so the window does not freeze while it waits for the server |
 | Databases | SQLite with `?` placeholders: connect, execute, commit, close |
 | Client-server | `desktop.py` opens a socket, connects, sends a GET or POST request with `sendall`, reads the response with `recv` until the server closes, and reads the status line |
-| Web (Flask) | routes with variables (`/study/<deck>`), GET and POST, `render_template`, `redirect`, `abort` with 400, 404 and 409, `jsonify` |
+| Web (Flask) | routes with variables (`/study/<deck>`), GET and POST, `render_template`, `redirect` with a message, a `static` stylesheet, `abort` with 400, 404 and 409, `jsonify` |
 
 ## Errors it handles
 
 | Situation | What happens |
 |---|---|
-| Empty deck, question or answer in the form | the home page shows "deck, question and answer must not be empty" |
-| A deck name with `/`, or only dots | the home page shows "a deck name cannot contain / or be only dots" |
+| Empty deck, question or answer in the form | the home page shows "Deck, question and answer must not be empty." in red |
+| A deck name with `/`, or only dots | the home page shows "A deck name cannot contain / or be only dots." in red |
 | Unknown deck or card in the URL | 404 Not Found |
-| A card answered twice on one day | the web page just shows the next card; the JSON API answers 409 Conflict |
+| A card answered twice on one day | the web page says "That card was already answered." and shows the next card; the JSON API answers 409 Conflict |
 | `knew_it` other than `yes` or `no` | 400 Bad Request |
 | A GET to a route that only takes POST | 405 Method Not Allowed (Flask) |
 | Desktop app started before the server | the window says "Cannot reach the server. Start server.py first." |
