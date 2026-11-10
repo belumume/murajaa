@@ -1,80 +1,173 @@
-# Murajaa (مراجعة): a Leitner flash-card trainer
+# Murajaa (مراجعة): a flash-card trainer
 
-Advanced Programming (CCS 3474), individual project. Ubaidullah Shuaib.
+Advanced Programming 462, individual project. Ubaidullah Shuaib.
 
-Murajaa means *review*. It keeps question-and-answer cards in five Leitner boxes. A card
-you answer right moves up one box and waits longer before it comes back; a card you miss
-goes back to box 1 and comes back the next day. So the cards you know come back less and
-less often, and the ones you keep missing come back every day. A card counts once on each day
-it is due, so a double click does not move it twice.
+Murajaa means *review*. It keeps question-and-answer cards for revising before an exam. In the
+Tkinter window you add, view, edit and delete cards, and filter them by deck. The window sends
+every action to a Flask server, which checks the values and saves the cards in SQLite.
+
+**Extra feature: study mode.** Each card sits in one of five boxes. *Study due cards* shows the
+cards that are due today, one at a time. A card you knew moves up one box and comes back later;
+a card you missed goes back to box 1 and comes back tomorrow. So the cards you know well come back
+less and less often, and the ones you keep missing come back every day.
 
 | Box | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
 | Comes back after | 1 day | 2 days | 4 days | 7 days | 14 days |
 
-It starts with 26 cards for this course's final exam (collections, exceptions, OOP, GUI,
-threads, SQLite, sockets, Flask) and common Python mistakes. You can add your own decks.
+The database starts with 26 sample cards for this course's final exam and common Python mistakes.
 
-## Two ways to study, one server
-
-```
- browser ──── HTML pages ────┐
-                             ├── server.py (Flask) ── store.py ── murajaa.db (SQLite)
- desktop.py ── JSON API ─────┘
- (Tkinter)
-```
-
-- **In the browser**: `http://127.0.0.1:5077`. The home page shows every deck and how many
-  cards sit in each box; *Study* shows the next due card; a form adds a card.
-- **On the desktop**: `desktop.py` is a Tkinter window that asks the same server for the
-  due cards as JSON and sends each answer back. It writes each HTTP request itself, over a socket.
-
-## Run it
-
-Python 3.10 or newer. In the `murajaa` folder:
+## How the parts connect
 
 ```
-pip install flask
-python seed.py        # once: adds the 26 starter cards
-python server.py      # keep this running
-python desktop.py     # in a second terminal (keys: space, 1, 2)
-python lock_demo.py   # shows why the server needs its lock
+desktop.py (Tkinter)  ──HTTP request──▶  server.py (Flask, port 5050)  ──SQL──▶  murajaa.db (SQLite)
+                      ◀──JSON reply────                                ◀──rows──
 ```
 
-## The files
+The user only works in the window. The window never touches the database: it sends a request to
+Flask with `urlopen`, Flask uses SQLite through the `CardStore` class, and the JSON reply tells the
+window what to show.
+
+## Install and run
+
+Python 3.10 or newer. In this folder:
+
+```
+pip install -r requirements.txt
+python seed.py        # creates the cards table and adds the 26 sample cards (once)
+python server.py      # starts Flask on http://127.0.0.1:5050; keep it running
+python desktop.py     # in a second terminal: the window
+```
+
+`seed.py` is optional: the server also creates the table when it starts, and keeps any cards
+already saved. Without `seed.py` the window starts with an empty list.
+
+Report helper (with the server running):
+
+```
+python report.py              # writes report.txt
+python report.py cards.txt    # writes cards.txt
+```
+
+Automatic checks (they start their own test server on port 5051 with an empty database):
+
+```
+python checks.py
+```
+
+## Using the window
+
+- The table lists the cards. *Show* picks one deck or all decks.
+- Click a card to show it in the form. Change the fields and press *Save changes*, or press
+  *Delete* (the window asks first).
+- To add a card, press *Clear*, fill in the four fields and press *Add card*.
+- *Study due cards* opens the study window for the deck that is shown.
+- The line at the bottom shows what happened, in green, or what went wrong, in red.
+
+## Routes
+
+| Method | Address | What it does | Errors (JSON) |
+|---|---|---|---|
+| GET | `/cards` | every card (the report helper uses this) | |
+| GET | `/cards?deck=AP+final` | the cards of one deck | |
+| GET | `/cards/<id>` | one card | 404 unknown ID |
+| GET | `/decks` | the deck names | |
+| GET | `/due?deck=AP+final` | the cards due today | |
+| POST | `/cards/add` | adds a card from the form fields | 400 missing or too long field |
+| POST | `/cards/<id>/edit` | changes the text of a card | 404 unknown ID, 400 bad field |
+| POST | `/cards/<id>/delete` | deletes a card | 404 unknown ID |
+| POST | `/cards/<id>/answer` | records a study answer, `knew_it=yes` or `no` | 400, 404, 409 already answered today |
+
+Each card has an ID, a name, a deck, a question, an answer, a box (1 to 5) and a due date. The
+name is required and has at most 40 characters; the deck 30, the question 300, the answer 500
+(`LIMITS` in `cards.py`). An address the server does not have gives a JSON 404, and a GET to a
+POST address a JSON 405.
+
+## One request from Tkinter and its reply
+
+Adding a card: the user fills in the form and presses *Add card*.
+
+1. `CardWindow.add_card` (`desktop.py`) calls `ask_server('/cards/add', values)` (`client.py`).
+2. `ask_server` turns the dictionary into a form body, `name=urlopen&deck=AP+final&...`, with
+   `urlencode(values).encode('utf-8')`, and passes it to `urlopen` as `data`. Because `data` is
+   given, `urlopen` sends a POST to `http://127.0.0.1:5050/cards/add`.
+3. Flask calls `CardServer.add_card` (`server.py`). `read_form` reads `request.form` and checks
+   each field with `check_text` (`cards.py`). `CardStore.add` (`store.py`) runs the `INSERT`
+   with `?` placeholders.
+4. Flask replies with status 201 and the new card as JSON, for example
+   `{"id": 27, "name": "urlopen", "deck": "AP final", "box": 1, "due": "2026-11-10", ...}`.
+5. `ask_server` reads it with `json.loads`. The window reloads the table, selects the new card and
+   shows *Added "urlopen" to AP final with ID 27.*
+
+If the name is empty, step 3 stops: Flask replies with status 400 and
+`{"error": "The name must not be empty."}`. `urlopen` raises `HTTPError`, `ask_server` reads the
+message with `error.read()` and raises `ServerError`, and the window shows the message in red.
+
+## Where each course topic is used
+
+| Topic | File: function or class |
+|---|---|
+| Python and collections | `cards.py`: `INTERVALS` and `LIMITS` dictionaries; `server.py`: `read_form` builds a dictionary in a loop over the `FIELDS` list; `store.py`: `all_cards` returns a list of `Card` objects; `report.py`: `build_report` groups the cards in a dictionary of lists and counts the boxes |
+| Exceptions | `cards.py`: `CardError(Exception)` and its subclass `NotDueError`, raised by `check_text`, `Card.record_answer` and `CardStore.get`; `server.py`: caught in every route and turned into JSON 400, 404 or 409; `client.py`: `ServerError`, and `HTTPError` caught before `URLError`, plus `socket.timeout` and other connection errors (`OSError`); `report.py`: `OSError` when the file cannot be written; `store.py`: `try/finally` closes every connection |
+| Classes | `cards.py`: `Card`; `store.py`: `CardStore` holds every SQL query; `server.py`: `CardServer`, the Flask app with one method per route; `desktop.py`: `CardWindow` and `StudyWindow` |
+| SQLite | `store.py`: `CardStore` (`CREATE TABLE IF NOT EXISTS`, `INSERT`, `SELECT`, `UPDATE`, `DELETE`, all with `?` placeholders); `_query` connects, executes, commits and closes, so every request has its own connection |
+| Threads and files | `report.py`: `main` starts one `threading.Thread` running `write_report`, then `join()`; `write_report` writes the UTF-8 report inside `with open(...)`. `server.py`: `answer_lock`, because Flask answers requests in several threads at once |
+| Tkinter | `desktop.py`: `CardWindow` (`Entry`, `Text`, `Button`, `ttk.Combobox`, `ttk.Treeview`, `messagebox.askyesno`, `grid` and `pack`) and `StudyWindow` (`Toplevel`) |
+| Client and server | `client.py`: `ask_server` (`urlopen`, `urlencode`, `json.loads`, `timeout=5`); see *One request from Tkinter and its reply* above |
+| Flask | `server.py`: `CardServer` registers the routes with `add_url_rule`, reads `request.form` and `request.args`, returns `jsonify(...)` with a status code, and handles 404 and 405 with `register_error_handler` |
+
+## Files
 
 | File | What it holds |
 |---|---|
-| `cards.py` | `Card` class: the Leitner rule (`answer`), `is_due`, `to_dict`; `CardError` and `NotDueError` exceptions; `INTERVALS` dictionary |
-| `store.py` | `CardStore` class: every SQLite query (create, insert, select, update) |
-| `server.py` | Flask application: web pages, JSON API, the lock around answers |
-| `desktop.py` | Tkinter client: HTTP over a socket (`ask_server`), a worker thread for each request, a queue back to the window |
-| `seed.py` | the starter cards, as a list of tuples |
-| `lock_demo.py` | four answers to one card at the same moment, with and without the lock |
-| `templates/` | `home.html` and `study.html` |
-| `static/style.css` | the look of both pages |
+| `server.py` | Flask back end, the `CardServer` class |
+| `store.py` | `CardStore`: the SQLite table and every query |
+| `cards.py` | `Card`, the study rule, the field checks and the exceptions |
+| `desktop.py` | Tkinter front end: `CardWindow` and `StudyWindow` |
+| `client.py` | `ask_server`: one HTTP request with `urlopen` |
+| `report.py` | report helper: a thread writes a text report |
+| `seed.py` | creates the table and adds the sample cards |
+| `checks.py` | automatic checks of every route |
+| `requirements.txt` | the package to install (Flask) |
 
-## Where each chapter is used
+## Test results
 
-| Chapter | Where |
+Run on 10 Nov 2026, Python 3.12, Flask 3.1.3.
+
+**`python checks.py`: 29 passed, 0 failed.** It covers: an empty list; add (new ID, box 1, spaces
+trimmed); view all, one deck, one card, the deck names; missing name, an answer of only spaces and
+a 41-character name each give 400 with a message, and a failed add saves nothing; edit changes only
+the chosen card, and an empty question gives 400; delete removes only the chosen card; an unknown
+ID gives 404 for view, edit and delete; study answers move the box, a second answer the same day
+gives 409, and a wrong `knew_it` gives 400; an unknown address gives JSON 404 and a GET to a POST
+address JSON 405; with the server stopped the message is "Cannot reach the server. Start
+server.py and try again."; after a restart on the same file the cards are still there; the report
+file is saved, and a folder that does not exist is reported without a crash.
+
+**Window checks:**
+
+| Check | Result |
 |---|---|
-| Collections and generic types | `INTERVALS` dict (box → days); `STARTER_CARDS` list of tuples; `summary()` builds a dict of dicts; type hints such as `date | None` in `cards.py` and `list[Card]` in `store.py` |
-| Exceptions | `CardError(Exception)` and its subclass `NotDueError`, raised by `Card` and `CardStore.get` and caught in the server (message, 404 or 409); `ServerError`, `OSError` and `ValueError` caught in the desktop app; `try/finally` closes every database connection and socket |
-| OOP | classes `Card`, `CardStore`, `StudyWindow`; constructors with validation; `__str__` |
-| GUI | `desktop.py`: `Tk`, `Label`, `Button`, `OptionMenu`, `Frame`, `grid` and `pack`, key bindings with `bind`, `mainloop`, `after` |
-| Multithreading | `threading.Lock` in `server.py` so that only one of several answers arriving together counts (`lock_demo.py`); worker threads and a `queue.Queue` in `desktop.py` so the window does not freeze while it waits for the server |
-| Databases | SQLite with `?` placeholders: connect, execute, commit, close |
-| Client-server | `desktop.py` opens a socket, connects, sends a GET or POST request with `sendall`, reads the response with `recv` until the server closes, and reads the status line |
-| Web (Flask) | routes with variables (`/study/<deck>`), GET and POST, `render_template`, `redirect` with a message, a `static` stylesheet, `abort` with 400, 404 and 409, `jsonify` |
+| Followed this README in a new, empty folder and environment | works |
+| Start with the 26 sample cards | table shows 26 cards |
+| Click a card | form shows its name, deck, question and answer |
+| Add with an empty name | red: "The name must not be empty." Nothing saved |
+| Add a valid card | green: "Added "urlopen" to AP final with ID 27." The new card is selected in the table |
+| Edit that card's name | the table shows the new name; card 1 is unchanged |
+| Show *Python mistakes* only | 5 cards |
+| Delete card 27 (Yes in the confirmation box) | 26 cards again |
+| Same card open in two windows: delete in one, then *Save changes* in the other | red: "There is no card with ID 27. It may have been deleted." The table reloads |
+| Study: *I knew it*, then *I did not* | "Now in box 2, back on 12 Nov." then "Now in box 1, back on 11 Nov."; after closing the study window the table shows card 1 in box 2 |
+| Stop the server, then *Refresh* and *Add card* | red: "Cannot reach the server. Start server.py and try again." |
+| Start the server again, press *Add card* again (same window) | the card is added |
+| Stop and start both programs | the saved cards are still there |
+| `python report.py` | "Saved 26 cards to report.txt"; the file lists every card by deck with its box and due date |
+| `python report.py /nonexistent/report.txt` | "The report was not saved: [Errno 2] No such file or directory: ..." |
 
-## Errors it handles
+## Credits
 
-| Situation | What happens |
-|---|---|
-| Empty deck, question or answer in the form | the home page shows "Deck, question and answer must not be empty." in red |
-| A deck name with `/`, or only dots | the home page shows "A deck name cannot contain / or be only dots." in red |
-| Unknown deck or card in the URL | 404 Not Found |
-| A card answered twice on one day | the web page says "That card was already answered." and shows the next card; the JSON API answers 409 Conflict |
-| `knew_it` other than `yes` or `no` | 400 Bad Request |
-| A GET to a route that only takes POST | 405 Method Not Allowed (Flask) |
-| Desktop app started before the server | the window says "Cannot reach the server. Start server.py first." |
+- [Flask](https://flask.palletsprojects.com/) (BSD-3-Clause licence). Everything else is the
+  Python standard library.
+- The study boxes follow the Leitner system for flash cards.
+- The sample cards were written for this project from the course material.
+- Parts of the code were written with help from an AI coding assistant.
