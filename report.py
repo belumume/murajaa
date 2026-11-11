@@ -26,8 +26,8 @@ def build_report(cards: list[dict]) -> str:
         counts = {box: 0 for box in INTERVALS}
         for card in deck_cards:
             counts[card['box']] += 1
-        lines.append(deck + ' (' + str(len(deck_cards)) + ' cards; boxes 1 to 5: '
-                     + ' '.join(str(counts[box]) for box in INTERVALS) + ')')
+        boxes = ', '.join('box ' + str(box) + ': ' + str(counts[box]) for box in INTERVALS)
+        lines.append(deck + ' (' + str(len(deck_cards)) + ' cards; ' + boxes + ')')
         for card in deck_cards:
             lines.append('  ' + str(card['id']).rjust(3) + '  box ' + str(card['box']) + '  due '
                          + card['due'] + '  ' + card['name'])

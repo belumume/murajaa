@@ -57,6 +57,3 @@ class Card:
     def to_dict(self) -> dict:
         return {'id': self.card_id, 'name': self.name, 'deck': self.deck, 'question': self.question,
                 'answer': self.answer, 'box': self.box, 'due': self.due.isoformat()}
-
-    def __str__(self) -> str:
-        return self.deck + ' | box ' + str(self.box) + ' | ' + self.name
