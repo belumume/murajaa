@@ -63,8 +63,9 @@ python checks.py
 - To add a card, press *Clear* (the form is headed *New card*, and *Save changes* and *Delete* are
   greyed out), fill in the four fields and press *Add card*. Pick the deck from the list or type a
   new one.
-- *Study 26 due cards* (the number of cards due) opens the study window for the deck that is
-  shown. It shows one card at a time, *Card 3 of 21*.
+- The *Study … due cards* button shows how many cards are due (for example *Study 21 due cards*
+  for AP final) and opens the study window for the deck that is shown. It shows one card at a time,
+  *Card 3 of 21*.
 - The line at the bottom shows what happened, in teal, or what went wrong, in red.
 
 ## Routes
@@ -132,6 +133,8 @@ message with `error.read()` and raises `ServerError`, and the window shows the m
 | `seed.py` | creates the table and adds the sample cards |
 | `checks.py` | automatic checks of every route |
 | `requirements.txt` | the package to install (Flask) |
+| `Murajaa-presentation.pptx` | the slides (PowerPoint) |
+| `Murajaa-presentation.pdf` | the same slides as a PDF |
 
 ## Test results
 
@@ -156,7 +159,7 @@ file is saved, and a folder that does not exist is reported without a crash.
 | Start, before choosing a card | form headed *New card*; *Save changes* and *Delete* greyed out |
 | Click a card | form headed *Card 1* shows its name, deck, question and answer; *Save changes* and *Delete* are no longer greyed out |
 | Add with an empty name | red: "The name must not be empty." Nothing saved |
-| Add a valid card | teal: "Added "urlopen" to AP final with ID 27." The new card is selected in the table |
+| Add a valid card | teal: *Added "urlopen" to AP final with ID 27.* The new card is selected in the table |
 | Edit that card's name | the table shows the new name; card 1 is unchanged |
 | Show *Python mistakes* only | 5 cards |
 | Delete card 27 (Yes in the confirmation box) | 26 cards again |
