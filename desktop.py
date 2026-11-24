@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from client import ServerError, ask_server
 
 ALL_DECKS = 'All decks'
-TEAL = '#0f766e'  # the one colour: due cards, the chosen row and good news
+TEAL = '#0b5d57'  # the one colour: due cards, the chosen row and good news (dark enough to read on grey)
 RED = '#b42318'   # error messages, and the line on the study card
 CARD_WHITE = '#fffdf7'
 

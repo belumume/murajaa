@@ -14,7 +14,7 @@ one box and comes back later; a card you missed goes back to box 1 and comes bac
 |---|---|---|---|---|---|
 | Comes back after | 1 day | 2 days | 4 days | 7 days | 14 days |
 
-The database starts with 26 sample cards for this course's final exam and common Python mistakes.
+`seed.py` adds 26 sample cards for this course's final exam and common Python mistakes.
 
 ## How the parts connect
 
@@ -85,7 +85,9 @@ python checks.py
 Each card has an ID, a name, a deck, a question, an answer, a box (1 to 5) and a due date. The
 name is required and has at most 40 characters; the deck 30, the question 300, the answer 500
 (`LIMITS` in `cards.py`). An address the server does not have gives a JSON 404, and a GET to a
-POST address a JSON 405.
+POST address a JSON 405. If SQLite fails while the server is running, for example because the
+database file cannot be opened, the reply is a JSON 500, "The server could not use the database.
+Try again." An ID too large for SQLite gives a JSON 404.
 
 ## One request from Tkinter and its reply
 
@@ -112,13 +114,13 @@ message with `error.read()` and raises `ServerError`, and the window shows the m
 | Topic | File: function or class |
 |---|---|
 | Python and collections | `cards.py`: `INTERVALS` and `LIMITS` dictionaries; `server.py`: `read_form` builds a dictionary in a loop over the `FIELDS` list; `store.py`: `all_cards` returns a list of `Card` objects; `report.py`: `build_report` groups the cards in a dictionary of lists and counts the boxes |
-| Exceptions | `cards.py`: `CardError(Exception)` and its subclass `NotDueError`.<br>`server.py`: every route catches them and replies with JSON 400, 404 or 409.<br>`client.py`: `HTTPError` caught before `URLError`, then `socket.timeout` and `OSError`, all turned into `ServerError`.<br>`report.py`: `OSError` when the file cannot be written.<br>`store.py`: `try/finally` closes every connection. |
+| Exceptions | `cards.py`: `CardError(Exception)` and its subclass `NotDueError`.<br>`server.py`: every route catches them and replies with JSON 400, 404 or 409; `database_failed` turns any `sqlite3.Error` into a JSON 500, and `id_too_big` turns the `OverflowError` of a too-large ID into a JSON 404.<br>`client.py`: `HTTPError` caught before `URLError`, then `socket.timeout` and `OSError`, all turned into `ServerError`.<br>`report.py`: `OSError` when the file cannot be written.<br>`store.py`: `try/finally` closes every connection. |
 | Classes | `cards.py`: `Card`; `store.py`: `CardStore` holds every SQL query; `server.py`: `CardServer`, the Flask app with one method per route; `desktop.py`: `CardWindow` and `StudyWindow` |
 | SQLite | `store.py`: `CardStore` (`CREATE TABLE IF NOT EXISTS`, `INSERT`, `SELECT`, `UPDATE`, `DELETE`, all with `?` placeholders); `_query` connects, executes, commits and closes, so every request has its own connection |
 | Threads and files | `report.py`: `main` starts one `threading.Thread` running `write_report`, then `join()`; `write_report` writes the UTF-8 report inside `with open(...)`. `server.py`: `answer_lock`, because Flask answers requests in several threads at once |
 | Tkinter | `desktop.py`: `CardWindow` (`ttk.Entry`, `Text`, `ttk.Button`, `ttk.Combobox`, `ttk.Treeview` with a `tag_configure` for due rows, `messagebox.askyesno`, `grid` and `pack`, the `clam` theme) and `StudyWindow` (`Toplevel`, a `Frame` drawn as an index card) |
 | Client and server | `client.py`: `ask_server` (`urlopen`, `urlencode`, `json.loads`, `timeout=5`); see *One request from Tkinter and its reply* above |
-| Flask | `server.py`: `CardServer` registers the routes with `add_url_rule`, reads `request.form` and `request.args`, returns `jsonify(...)` with a status code, and handles 404 and 405 with `register_error_handler` |
+| Flask | `server.py`: `CardServer` registers the routes with `add_url_rule`, reads `request.form` and `request.args`, returns `jsonify(...)` with a status code, and handles 404, 405, `sqlite3.Error` and `OverflowError` with `register_error_handler` |
 
 ## Files
 
@@ -135,27 +137,33 @@ message with `error.read()` and raises `ServerError`, and the window shows the m
 | `requirements.txt` | the package to install (Flask) |
 | `Murajaa-presentation.pptx` | the slides (PowerPoint) |
 | `Murajaa-presentation.pdf` | the same slides as a PDF |
+| `Murajaa-report.pdf` | a short written report: what the app does, how the parts connect, a screenshot of each action, one request traced through the code, the course topics and the test results |
+| `screenshots/` | screenshots of the running app, one for each action and error (used in the report and the slides) |
 
 ## Test results
 
-Run on 11 Nov 2026, Python 3.12, Flask 3.1.3.
+Run on 24 Nov 2026, Python 3.13.15, Flask 3.1.3.
 
-**`python checks.py`: 29 passed, 0 failed.** It covers: an empty list; add (new ID, box 1, spaces
+**`python checks.py`: 34 passed, 0 failed.** It covers: an empty list; add (new ID, box 1, spaces
 trimmed); view all, one deck, one card, the deck names; missing name, an answer of only spaces and
 a 41-character name each give 400 with a message, and a failed add saves nothing; edit changes only
 the chosen card, and an empty question gives 400; delete removes only the chosen card; an unknown
-ID gives 404 for view, edit and delete; study answers move the box, a second answer the same day
+ID gives 404 for view, edit and delete, and an ID too large for SQLite gives 404 for view and
+delete; study answers move the box, a second answer the same day
 gives 409, and a wrong `knew_it` gives 400; an unknown address gives JSON 404 and a GET to a POST
 address JSON 405; with the server stopped the message is "Cannot reach the server. Start
-server.py and try again."; after a restart on the same file the cards are still there; the report
-file is saved, and a folder that does not exist is reported without a crash.
+server.py and try again."; after a restart on the same file the cards are still there; a server
+that cannot open its database gives a JSON 500 with a message; a server that takes the connection
+but never answers gives "The server took too long to answer. Try again." after the 5-second
+timeout; the report file is saved, a folder that does not exist is reported without a crash, and
+`report.main()` starts the thread, waits with `join()` and saves the file.
 
-**Window checks:**
+**Window checks** (run on 11 Nov 2026; the actions in `screenshots/` were repeated on 24 Nov 2026):
 
 | Check | Result |
 |---|---|
 | Followed this README in a new, empty folder and environment | works |
-| Start with the 26 sample cards | table shows 26 cards |
+| Start after `python seed.py` | table shows 26 cards |
 | Start, before choosing a card | form headed *New card*; *Save changes* and *Delete* greyed out |
 | Click a card | form headed *Card 1* shows its name, deck, question and answer; *Save changes* and *Delete* are no longer greyed out |
 | Add with an empty name | red: "The name must not be empty." Nothing saved |
@@ -178,4 +186,5 @@ file is saved, and a folder that does not exist is reported without a crash.
   Python standard library.
 - The study boxes follow the Leitner system for flash cards.
 - The sample cards were written for this project from the course material.
-- Parts of the code were written with help from an AI coding assistant.
+- Most of the code was written with an AI coding assistant. I directed the work and tested it, and I
+  can explain every file.

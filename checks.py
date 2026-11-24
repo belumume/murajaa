@@ -1,8 +1,11 @@
 # Checks the server through real HTTP requests, the same way the window sends them.
 # It starts its own server on port 5051 with an empty test database, so it does not
-# touch murajaa.db or a server already running on 5050. Run: python checks.py
+# touch murajaa.db or a server already running on 5050. Ports 5052 and 5053 are used
+# for the database-error and timeout checks. Run: python checks.py
 import logging
 import os
+import socket
+import sys
 import tempfile
 import threading
 
@@ -38,8 +41,12 @@ def error_of(path, values=None):
     return 200, ''
 
 
-def start_server(db_path, port):
-    http = make_server('127.0.0.1', port, CardServer(db_path).app, threaded=True)
+def start_server(db_path, port, broken_database=False):
+    card_server = CardServer(db_path)
+    if broken_database:
+        # a folder in place of the database file: SQLite cannot open it
+        card_server.store.path = os.path.dirname(db_path)
+    http = make_server('127.0.0.1', port, card_server.app, threaded=True)
     threading.Thread(target=http.serve_forever, daemon=True).start()
     return http
 
@@ -89,6 +96,10 @@ check('unknown ID: edit gives 404 (deleted in another window)',
       error_of('/cards/1/edit', {'name': 'n', 'deck': 'd', 'question': 'q', 'answer': 'a'})
       == (404, 'There is no card with ID 1. It may have been deleted.'))
 check('unknown ID: delete again gives 404', error_of('/cards/1/delete', {})[0] == 404)
+check('an ID too long for SQLite: view gives JSON 404',
+      error_of('/cards/99999999999999999999') == (404, 'There is no card with that ID.'))
+check('an ID too long for SQLite: delete gives JSON 404',
+      error_of('/cards/99999999999999999999/delete', {}) == (404, 'There is no card with that ID.'))
 
 check('study: /due lists the due cards', len(ask_server('/due?deck=AP')) == 1)
 answered = ask_server('/cards/2/answer', {'knew_it': 'yes'})
@@ -106,6 +117,23 @@ http = start_server(db_path, 5051)
 check('server started again on the same file: the cards are still there',
       [card['name'] for card in ask_server('/cards')] == ['sets (edited)', '/ and //'])
 
+# a second test server on port 5052 that cannot open its database
+client.SERVER = 'http://127.0.0.1:5052'
+broken = start_server(db_path, 5052, broken_database=True)
+check('database cannot be opened: JSON 500 with a message',
+      error_of('/cards') == (500, 'The server could not use the database. Try again.'))
+broken.shutdown()
+
+# a socket on port 5053 that takes the connection but never answers
+client.SERVER = 'http://127.0.0.1:5053'
+silent = socket.socket()
+silent.bind(('127.0.0.1', 5053))
+silent.listen()
+check('server does not answer: a clear message after the 5-second timeout',
+      error_of('/cards') == (0, 'The server took too long to answer. Try again.'))
+silent.close()
+client.SERVER = 'http://127.0.0.1:5051'
+
 result = {'saved': False, 'error': ''}
 report_path = os.path.join(folder, 'report.txt')
 report.write_report(ask_server('/cards'), report_path, result)
@@ -115,6 +143,11 @@ check('report: the file is saved and lists both cards', result['saved'] and 'set
 result = {'saved': False, 'error': ''}
 report.write_report([], os.path.join(folder, 'no such folder', 'report.txt'), result)
 check('report: a folder that does not exist is reported, not a crash', not result['saved'] and result['error'] != '')
+# the whole helper as a user runs it: ask the server, start() the thread, join() it
+main_path = os.path.join(folder, 'main_report.txt')
+sys.argv = ['report.py', main_path]
+report.main()
+check('report: main() runs the thread and saves the file', os.path.exists(main_path))
 
 http.shutdown()
 print()

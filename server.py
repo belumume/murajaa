@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import threading
 from datetime import date
 
@@ -37,6 +38,9 @@ class CardServer:
         self.app.add_url_rule('/cards/<int:card_id>/answer', view_func=self.answer_card, methods=['POST'])
         self.app.register_error_handler(404, self.unknown_address)
         self.app.register_error_handler(405, self.wrong_method)
+        # errors the routes do not catch themselves: the reply is still JSON, not an HTML page
+        self.app.register_error_handler(sqlite3.Error, self.database_failed)
+        self.app.register_error_handler(OverflowError, self.id_too_big)
 
     def read_form(self) -> dict:
         # the four text fields sent by the window; raises CardError on a bad value
@@ -117,13 +121,21 @@ class CardServer:
             self.store.update(card)
         return jsonify(card.to_dict())
 
-    # ---------- errors for addresses that do not exist ----------
+    # ---------- errors: unknown addresses, and failures the routes do not catch ----------
 
     def unknown_address(self, error):
         return error_reply('The server has no such address.', 404)
 
     def wrong_method(self, error):
         return error_reply('This address does not take that kind of request.', 405)
+
+    def database_failed(self, error):
+        # for example the database file cannot be opened, or another program has locked it
+        return error_reply('The server could not use the database. Try again.', 500)
+
+    def id_too_big(self, error):
+        # SQLite cannot hold a number this long, so no card can have this ID
+        return error_reply('There is no card with that ID.', 404)
 
     def run(self):
         self.app.run(port=PORT)
